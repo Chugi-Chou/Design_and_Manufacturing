@@ -98,6 +98,8 @@ int main(void)
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
 
+  App_Init();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */

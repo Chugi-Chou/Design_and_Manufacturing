@@ -34,13 +34,30 @@ extern "C" {
     }
 
     void App_Task_1ms(void) {
-        // 按钮逻辑：PH10
-        static bool last_btn = true;
-        bool curr_btn = HAL_GPIO_ReadPin(GPIOH, GPIO_PIN_10);
-        if (last_btn && !curr_btn) { // 下降沿触发
-            motor_task.SetTarget(POSITION_MODE, motor_task.GetCurrentAngle() + 360.0f);
+        static uint16_t btn_filter = 0; //防抖滤波
+        static bool is_waiting_for_finish = false; //状态锁
+        bool raw_pin = (HAL_GPIO_ReadPin(GPIOH, GPIO_PIN_10) == GPIO_PIN_RESET);
+
+        if (!is_waiting_for_finish) {
+            if (raw_pin) {
+                btn_filter++;
+                if (btn_filter >= 20) {
+                    motor_task.SetTarget(POSITION_MODE, motor_task.GetCurrentAngle() + 360.0f);
+                    is_waiting_for_finish = true;
+                    btn_filter = 0;
+                }
+            } else {
+                btn_filter = 0;
+            }
+        } else {
+
+            float error = motor_task.GetCurrentAngle() - (motor_task.GetCurrentAngle());
+            if (motor_task.IsTargetReached()) {
+                if (!raw_pin) {
+                    is_waiting_for_finish = false;
+                }
+            }
         }
-        last_btn = curr_btn;
 
         CAN_Send(motor_task.ExecuteControl(), motor_always.ExecuteControl());
     }
@@ -60,7 +77,6 @@ extern "C" {
         CAN_RxHeaderTypeDef hdr;
         uint8_t data[8];
         if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &hdr, data) == HAL_OK) {
-            // 直接处理或调用你写的 App_CAN_Callback
             App_CAN_Callback(hdr.StdId, data);
         }
     }

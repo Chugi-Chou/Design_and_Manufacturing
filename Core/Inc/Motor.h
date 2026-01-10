@@ -17,6 +17,7 @@ public:
     void UpdateFeedback(uint8_t data[8]);
     int16_t ExecuteControl();
     float GetCurrentAngle() const { return total_angle; }
+    bool IsTargetReached(float threshold = 1.0f);
 
 private:
     PID pos_controller;

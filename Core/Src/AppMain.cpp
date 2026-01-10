@@ -12,10 +12,28 @@ PID p_pid(10.0f, 0.01f, 0.0f, 0.2f, 500.0f, 0.0f, 0.0f);
 MotorM2006 motor_task(p_pid, s_pid);
 MotorM2006 motor_always(p_pid, s_pid);
 
+uint8_t d[8] = {0, 0, 0, 0, 0, 0, 0, 0}; //tx_data
+
+struct CAN_Debug_t {
+    uint32_t id;
+    uint8_t data[8];
+};
+
+static CAN_Debug_t can_rx_debug[2];
+
 void CAN_Send(int16_t c1, int16_t c2) {
     CAN_TxHeaderTypeDef hdr;
     uint32_t box;
-    uint8_t d[8] = { (uint8_t)(c1>>8), (uint8_t)c1, (uint8_t)(c2>>8), (uint8_t)c2, 0,0,0,0 };
+
+    d[0] = (uint8_t)(c1>>8);
+    d[1] = (uint8_t)c1;
+    d[2] = (uint8_t)(c2>>8);
+    d[3] = (uint8_t)c2;
+    d[4] = 0;
+    d[5] = 0;
+    d[6] = 0;
+    d[7] = 0;
+
     hdr.StdId = 0x200; hdr.IDE = CAN_ID_STD; hdr.RTR = CAN_RTR_DATA; hdr.DLC = 8;
     HAL_CAN_AddTxMessage(&hcan1, &hdr, d, &box);
 }
@@ -34,7 +52,7 @@ extern "C" {
         extern TIM_HandleTypeDef htim6;
         HAL_TIM_Base_Start_IT(&htim6);
 
-        motor_always.SetTarget(SPEED_MODE, 1000.0f);
+        motor_always.SetTarget(SPEED_MODE, 100.0f);
     }
 
     void App_Task_1ms(void) {
@@ -76,8 +94,19 @@ extern "C" {
     }
 
     void App_CAN_Callback(uint32_t std_id, uint8_t* data) {
-        if (std_id == 0x201) motor_task.UpdateFeedback(data);
-        else if (std_id == 0x202) motor_always.UpdateFeedback(data);
+
+        HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_10);
+
+        if (std_id == 0x201) {
+            can_rx_debug[0].id = std_id;
+            for (int i = 0; i < 8; i++) {can_rx_debug[0].data[i] = data[i];}
+            motor_task.UpdateFeedback(data);
+        }
+        else if (std_id == 0x202) {
+            can_rx_debug[1].id = std_id;
+            for (int i = 0; i < 8; i++) {can_rx_debug[1].data[i] = data[i];}
+            motor_always.UpdateFeedback(data);
+        }
     }
 
     void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {

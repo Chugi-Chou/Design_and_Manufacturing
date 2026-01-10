@@ -27,6 +27,10 @@ extern "C" {
         HAL_CAN_Start(&hcan1);
         HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
+        HAL_GPIO_WritePin(GPIOH, GPIO_PIN_10, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOH, GPIO_PIN_11, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOH, GPIO_PIN_12, GPIO_PIN_RESET);
+
         extern TIM_HandleTypeDef htim6;
         HAL_TIM_Base_Start_IT(&htim6);
 
@@ -36,7 +40,14 @@ extern "C" {
     void App_Task_1ms(void) {
         static uint16_t btn_filter = 0; //防抖滤波
         static bool is_waiting_for_finish = false; //状态锁
-        bool raw_pin = (HAL_GPIO_ReadPin(GPIOH, GPIO_PIN_10) == GPIO_PIN_RESET);
+        bool raw_pin = (HAL_GPIO_ReadPin(KEY_GPIO_Port, KEY_Pin) == GPIO_PIN_RESET);
+
+        static uint32_t heartbeat = 0;
+
+        if (++heartbeat >= 500) {
+            HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_11);
+            heartbeat = 0;
+        } //MCU运行指示灯
 
         if (!is_waiting_for_finish) {
             if (raw_pin) {
@@ -45,6 +56,7 @@ extern "C" {
                     motor_task.SetTarget(POSITION_MODE, motor_task.GetCurrentAngle() + 360.0f);
                     is_waiting_for_finish = true;
                     btn_filter = 0;
+                    HAL_GPIO_WritePin(GPIOH, GPIO_PIN_12, GPIO_PIN_SET);
                 }
             } else {
                 btn_filter = 0;
@@ -55,6 +67,7 @@ extern "C" {
             if (motor_task.IsTargetReached()) {
                 if (!raw_pin) {
                     is_waiting_for_finish = false;
+                    HAL_GPIO_WritePin(GPIOH, GPIO_PIN_12, GPIO_PIN_RESET);
                 }
             }
         }

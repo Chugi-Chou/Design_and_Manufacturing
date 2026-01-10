@@ -6,8 +6,8 @@
 #include "Motor.h"
 #include "can.h"
 
-PID s_pid(12.0f, 0.1f, 1.0f, 0.0f, 10000.0f, 2000.0f, 0.5f);
-PID p_pid(1.5f, 0.0f, 0.02f, 0.0f, 500.0f, 0.0f, 0.0f);
+PID s_pid(0.025f, 0.0002f, 0.005f, 0.2f, 10000.0f, 2000.0f, 0.5f);
+PID p_pid(10.0f, 0.01f, 0.0f, 0.2f, 500.0f, 0.0f, 0.0f);
 
 MotorM2006 motor_task(p_pid, s_pid);
 MotorM2006 motor_always(p_pid, s_pid);

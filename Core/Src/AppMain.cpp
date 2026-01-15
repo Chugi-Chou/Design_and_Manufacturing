@@ -6,20 +6,25 @@
 #include "Motor.h"
 #include "can.h"
 
-PID s_pid(0.025f, 0.0002f, 0.005f, 0.2f, 10000.0f, 2000.0f, 0.5f);
-PID p_pid(10.0f, 0.01f, 0.0f, 0.2f, 500.0f, 0.0f, 0.0f);
+PID s_pid_task(0.1f, 0.05f, 0.0f, 0.0f, 10000.0f, 8000.0f, 0.7f);
+PID p_pid_task(2.5f, 0.05f, 0.0f, 0.0f, 10000.0f, 0.0f, 0.0f); // 加上 Kd
 
-MotorM2006 motor_task(p_pid, s_pid);
-MotorM2006 motor_always(p_pid, s_pid);
+PID s_pid_always(1.5f, 0.005f, 0.0f, 0.0f, 15000.0f, 10000.0f, 0.5f);
+PID p_pid_always(1.0f, 0.0f, 0.0f, 0.0f, 10000.0f, 0.0f, 0.0f);
+
+MotorM2006 motor_task(p_pid_task, s_pid_task);
+MotorM2006 motor_always(p_pid_always, s_pid_always);
 
 uint8_t d[8] = {0, 0, 0, 0, 0, 0, 0, 0}; //tx_data
+
+float target_speed_debug = 800.0f;
 
 struct CAN_Debug_t {
     uint32_t id;
     uint8_t data[8];
 };
 
-static CAN_Debug_t can_rx_debug[2];
+volatile CAN_Debug_t can_rx_debug[2];
 
 void CAN_Send(int16_t c1, int16_t c2) {
     CAN_TxHeaderTypeDef hdr;
@@ -52,7 +57,8 @@ extern "C" {
         extern TIM_HandleTypeDef htim6;
         HAL_TIM_Base_Start_IT(&htim6);
 
-        motor_always.SetTarget(SPEED_MODE, 100.0f);
+        motor_always.SetTarget(SPEED_MODE, target_speed_debug);
+        motor_task.SetTarget(POSITION_MODE, 0);
     }
 
     void App_Task_1ms(void) {
@@ -67,11 +73,13 @@ extern "C" {
             heartbeat = 0;
         } //MCU运行指示灯
 
+        
         if (!is_waiting_for_finish) {
             if (raw_pin) {
                 btn_filter++;
                 if (btn_filter >= 20) {
-                    motor_task.SetTarget(POSITION_MODE, motor_task.GetCurrentAngle() + 360.0f);
+                    motor_task.SetTarget(POSITION_MODE, motor_task.GetCurrentAngle() + 82.0f);
+                    motor_task.SetTarget(POSITION_MODE, motor_task.GetCurrentAngle() - 82.0f);
                     is_waiting_for_finish = true;
                     btn_filter = 0;
                     HAL_GPIO_WritePin(GPIOH, GPIO_PIN_12, GPIO_PIN_SET);
@@ -89,6 +97,7 @@ extern "C" {
                 }
             }
         }
+        
 
         CAN_Send(motor_task.ExecuteControl(), motor_always.ExecuteControl());
     }
